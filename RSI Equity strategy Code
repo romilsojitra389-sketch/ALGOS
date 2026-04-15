@@ -1,0 +1,237 @@
+import time
+import os
+from datetime import datetime, timedelta
+import pandas as pd
+import math
+
+# ===== CAPITAL SETTINGS =====
+TOTAL_CAPITAL = 100000
+CAPITAL_PER_TRADE = 20000
+MAX_POSITIONS = 5
+
+# ===== NIFTY 50 TOKENS =====
+nifty50_tokens = {
+    "RELIANCE": "2885", "TCS": "11536", "INFY": "1594",
+    "HDFCBANK": "1333", "ICICIBANK": "4963", "HINDUNILVR": "1394",
+    "ITC": "1660", "SBIN": "3045", "BHARTIARTL": "10604",
+    "KOTAKBANK": "1922", "LT": "11483", "AXISBANK": "5900",
+    "ASIANPAINT": "236", "MARUTI": "10999", "SUNPHARMA": "3351",
+    "TITAN": "3506", "ULTRACEMCO": "11532", "NESTLEIND": "17963",
+    "POWERGRID": "14977", "NTPC": "11630", "ONGC": "2475",
+    "BAJFINANCE": "317", "BAJAJFINSV": "16675", "M&M": "2031",
+    "WIPRO": "3787", "HCLTECH": "7229", "TECHM": "13538",
+    "ADANIENT": "25", "ADANIPORTS": "15083", "JSWSTEEL": "11723",
+    "TATASTEEL": "3499", "COALINDIA": "20374", "INDUSINDBK": "5258",
+    "DRREDDY": "881", "EICHERMOT": "910", "GRASIM": "1232",
+    "HEROMOTOCO": "1348", "CIPLA": "694", "APOLLOHOSP": "157",
+    "BRITANNIA": "547", "DIVISLAB": "10940", "SBILIFE": "21808",
+    "HDFCLIFE": "467", "ICICIPRULI": "18652", "BAJAJ-AUTO": "16669",
+    "SHREECEM": "3103", "UPL": "11287", "TATAMOTORS": "3456"
+}
+
+# ===== CSV =====
+CSV_FILE = "trades.csv"
+
+if not os.path.exists(CSV_FILE):
+    pd.DataFrame(columns=[
+        "symbol","entry_price","qty","sl",
+        "entry_time","exit_price","exit_time","pnl","position"
+    ]).to_csv(CSV_FILE, index=False)
+
+trade_df = pd.read_csv(CSV_FILE)
+
+open_positions = {
+    row["symbol"]: {
+        "entry": row["entry_price"],
+        "qty": row["qty"],
+        "sl": row["sl"]
+    }
+    for _, row in trade_df[trade_df["position"] == 1].iterrows()
+}
+
+# ===== RSI =====
+def calculate_rsi(close):
+    delta = close.diff()
+
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = round(gain.iloc[1:15].mean(), 6)
+    avg_loss = round(loss.iloc[1:15].mean(), 6)
+
+    for i in range(15, len(close)):
+        avg_gain = ((avg_gain * 13) + round(gain.iloc[i],6)) / 14
+        avg_loss = ((avg_loss * 13) + round(loss.iloc[i],6)) / 14
+        avg_gain = round(avg_gain, 6)
+        avg_loss = round(avg_loss, 6)
+
+    if avg_loss == 0:
+        return 100
+
+    rs = avg_gain / avg_loss
+    return round(100 - (100 / (1 + rs)), 2)
+
+# ===== FETCH DATA =====
+def get_data(symbol, token):
+    try:
+        params = {
+            "exchange": "NSE",
+            "symboltoken": token,
+            "interval": "ONE_HOUR",
+            "fromdate": (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d %H:%M"),
+            "todate": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+
+        data = obj.getCandleData(params)
+
+        if "data" not in data or data["data"] is None:
+            return None
+
+        df = pd.DataFrame(data["data"], columns=[
+            "timestamp","open","high","low","close","volume"
+        ])
+
+        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        return df.dropna()
+
+    except:
+        time.sleep(2)
+        return None
+
+# ===== ORDER =====
+def place_order(symbol, token, qty):
+    orderparams = {
+        "variety": "NORMAL",
+        "tradingsymbol": symbol + "-EQ",
+        "symboltoken": token,
+        "transactiontype": "BUY",
+        "exchange": "NSE",
+        "ordertype": "MARKET",
+        "producttype": "DELIVERY",
+        "duration": "DAY",
+        "price": "0",
+        "quantity": str(qty)
+    }
+    return obj.placeOrder(orderparams)
+
+# ===== LTP =====
+def get_ltp(symbol, token):
+    try:
+        data = obj.ltpData("NSE", symbol + "-EQ", token)
+        return float(data["data"]["ltp"])
+    except:
+        return None
+
+# ===== LOG ENTRY =====
+def log_entry(symbol, price, qty, sl):
+    global trade_df
+    new_row = {
+        "symbol": symbol,
+        "entry_price": price,
+        "qty": qty,
+        "sl": sl,
+        "entry_time": datetime.now(),
+        "exit_price": "",
+        "exit_time": "",
+        "pnl": "",
+        "position": 1
+    }
+    trade_df = pd.concat([trade_df, pd.DataFrame([new_row])])
+    trade_df.to_csv(CSV_FILE, index=False)
+
+# ===== LOG EXIT =====
+def log_exit(symbol, price):
+    global trade_df
+
+    idx = trade_df[
+        (trade_df["symbol"] == symbol) &
+        (trade_df["position"] == 1)
+    ].index[-1]
+
+    entry_price = float(trade_df.loc[idx, "entry_price"])
+    qty = float(trade_df.loc[idx, "qty"])
+
+    pnl = (price - entry_price) * qty
+
+    trade_df.loc[idx, "exit_price"] = price
+    trade_df.loc[idx, "exit_time"] = datetime.now()
+    trade_df.loc[idx, "pnl"] = pnl
+    trade_df.loc[idx, "position"] = 0
+
+    trade_df.to_csv(CSV_FILE, index=False)
+
+# ===== BOT START =====
+print("📊 BOT STARTED\n")
+
+for symbol, token in nifty50_tokens.items():
+    try:
+        if len(open_positions) >= MAX_POSITIONS:
+            break
+
+        df = get_data(symbol, token)
+
+        if df is None or len(df) < 50:
+            continue
+
+        idx = len(df) - 1
+
+        prev_rsi = calculate_rsi(df.iloc[:idx]["close"])
+        curr_rsi = calculate_rsi(df.iloc[:idx+1]["close"])
+
+        # ===== ENTRY =====
+        if prev_rsi < 30 and curr_rsi > 30:
+
+            if symbol not in open_positions:
+
+                ltp = get_ltp(symbol, token)
+                if not ltp:
+                    continue
+
+                qty = math.floor(CAPITAL_PER_TRADE / ltp)
+                if qty == 0:
+                    continue
+
+                sl = ltp * 0.98
+
+                place_order(symbol, token, qty)
+
+                print(f"\n🛒 BUY: {symbol}")
+                print(f"Qty: {qty} | Price: {ltp} | SL: {round(sl,2)}")
+
+                log_entry(symbol, ltp, qty, sl)
+                open_positions[symbol] = {"entry": ltp, "qty": qty, "sl": sl}
+
+        # ===== EXIT =====
+        if symbol in open_positions:
+
+            ltp = get_ltp(symbol, token)
+            if not ltp:
+                continue
+
+            df = get_data(symbol, token)
+            if df is None:
+                continue
+
+            idx = len(df) - 1
+
+            prev_rsi = calculate_rsi(df.iloc[:idx]["close"])
+            curr_rsi = calculate_rsi(df.iloc[:idx+1]["close"])
+
+            entry = open_positions[symbol]["entry"]
+            sl = open_positions[symbol]["sl"]
+
+            if ltp <= sl or (prev_rsi <= 50 and curr_rsi > 50):
+
+                print(f"\n❌ EXIT: {symbol}")
+                print(f"RSI Exit → {prev_rsi} → {curr_rsi}")
+
+                log_exit(symbol, ltp)
+                del open_positions[symbol]
+
+        time.sleep(0.7)
+
+    except Exception as e:
+        print(f"Error {symbol}: {e}")
+        time.sleep(1)
+
+print("\n✅ BOT COMPLETE")
