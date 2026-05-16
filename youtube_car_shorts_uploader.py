@@ -39,7 +39,7 @@ def load_uploaded_state(state_file: Path) -> set[str]:
 
 
 def save_uploaded_state(state_file: Path, uploaded_files: set[str]) -> None:
-    temp_file = state_file.with_suffix(f"{state_file.suffix}.tmp")
+    temp_file = state_file.with_name(f"{state_file.name}.tmp")
     temp_file.write_text(
         json.dumps(sorted(uploaded_files), indent=2),
         encoding="utf-8",
@@ -126,12 +126,14 @@ def upload_video(
     while response is None:
         try:
             _, response = request.next_chunk()
-        except HttpError:
+        except HttpError as error:
             attempts += 1
+            print(f"Upload retry {attempts}/3 after API error: {error}")
             if attempts >= 3:
                 raise
-        except Exception:
+        except Exception as error:
             attempts += 1
+            print(f"Upload retry {attempts}/3 after unexpected error: {error}")
             if attempts >= 3:
                 raise
 
@@ -221,9 +223,11 @@ def main():
             )
             uploaded_state.add(str(video.resolve()))
             save_uploaded_state(state_file, uploaded_state)
-            print(f"Uploaded: {video.name} | videoId={video_id}")
+            print(f"Uploaded: {video.name} | videoID={video_id}")
         except HttpError as error:
             print(f"Failed to upload {video.name}: {error}")
+        except Exception as error:
+            print(f"Unexpected failure for {video.name}: {error}")
 
 
 if __name__ == "__main__":
