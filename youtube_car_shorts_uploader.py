@@ -39,10 +39,12 @@ def load_uploaded_state(state_file: Path) -> set[str]:
 
 
 def save_uploaded_state(state_file: Path, uploaded_files: set[str]) -> None:
-    state_file.write_text(
+    temp_file = state_file.with_suffix(f"{state_file.suffix}.tmp")
+    temp_file.write_text(
         json.dumps(sorted(uploaded_files), indent=2),
         encoding="utf-8",
     )
+    temp_file.replace(state_file)
 
 
 def authenticate(client_secrets_path: Path, token_file: Path) -> Resource:
@@ -120,8 +122,18 @@ def upload_video(
     )
 
     response = None
+    attempts = 0
     while response is None:
-        _, response = request.next_chunk()
+        try:
+            _, response = request.next_chunk()
+        except HttpError:
+            attempts += 1
+            if attempts >= 3:
+                raise
+        except Exception:
+            attempts += 1
+            if attempts >= 3:
+                raise
 
     return response["id"]
 

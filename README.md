@@ -1,5 +1,5 @@
 # ALGOS
-Algorithmic Trading Strategies COdes
+Algorithmic Trading Strategies Codes
 
 ## YouTube car Shorts uploader
 
