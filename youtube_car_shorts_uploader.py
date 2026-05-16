@@ -7,6 +7,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.discovery import Resource
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
@@ -44,7 +45,7 @@ def save_uploaded_state(state_file: Path, uploaded_files: set[str]) -> None:
     )
 
 
-def authenticate(client_secrets_path: Path, token_file: Path):
+def authenticate(client_secrets_path: Path, token_file: Path) -> Resource:
     credentials = None
 
     if token_file.exists():
@@ -88,7 +89,7 @@ def candidate_videos(
 
 
 def upload_video(
-    youtube,
+    youtube: Resource,
     file_path: Path,
     title_prefix: str,
     privacy_status: str,

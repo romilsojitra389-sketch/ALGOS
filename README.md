@@ -3,7 +3,7 @@ Algorithmic Trading Strategies COdes
 
 ## YouTube car Shorts uploader
 
-Use `/home/runner/work/ALGOS/ALGOS/youtube_car_shorts_uploader.py` to upload car short videos to your YouTube channel.
+Use `youtube_car_shorts_uploader.py` to upload car short videos to your YouTube channel.
 
 Install dependencies:
 
@@ -14,7 +14,7 @@ pip install google-api-python-client google-auth google-auth-oauthlib google-aut
 Run:
 
 ```bash
-python /home/runner/work/ALGOS/ALGOS/youtube_car_shorts_uploader.py \
+python youtube_car_shorts_uploader.py \
   --videos-dir /absolute/path/to/your/videos \
   --client-secrets /absolute/path/to/client_secrets.json \
   --privacy-status private

@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+client_secrets.json
+youtube_token.json
+.uploaded_car_shorts.json
