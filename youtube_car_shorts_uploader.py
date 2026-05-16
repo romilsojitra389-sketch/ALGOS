@@ -14,6 +14,7 @@ from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm"}
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 DEFAULT_CAR_KEYWORDS = (
     "car",
     "cars",
@@ -114,7 +115,9 @@ def upload_video(
         },
     }
 
-    media_file = MediaFileUpload(str(file_path), chunksize=-1, resumable=True)
+    media_file = MediaFileUpload(
+        str(file_path), chunksize=UPLOAD_CHUNK_SIZE, resumable=True
+    )
     request = youtube.videos().insert(
         part="snippet,status",
         body=request_body,
@@ -126,6 +129,7 @@ def upload_video(
     while response is None:
         try:
             _, response = request.next_chunk()
+            attempts = 0
         except HttpError as error:
             attempts += 1
             print(f"Upload retry {attempts}/3 after API error: {error}")
