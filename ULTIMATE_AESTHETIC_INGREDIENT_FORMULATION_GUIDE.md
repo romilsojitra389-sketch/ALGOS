@@ -180,6 +180,7 @@
 
 ## 9) The ROI Logic Behind ₹999
 
+- This guide is structured as a **₹999 one-time digital handbook**.
 - One wrong luxury purchase can cost ₹2,000–₹6,000.
 - Choosing formula-fit products from pharmacy/affordable brands cuts waste.
 - Learning concentration thresholds prevents overpaying for marketing-led claims.
